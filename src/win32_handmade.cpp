@@ -25,6 +25,7 @@ X_INPUT_GET_STATE(XInputGetStateStub)
     return 0;
 }
 static x_input_get_state *XInputGetStateWrapper = XInputGetStateStub;
+#define XInputGetState XInputGetStateWrapper
 
 // XInput dereference SetState
 #define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
@@ -34,6 +35,7 @@ X_INPUT_SET_STATE(XInputSetStateStub)
     return 0;
 }
 static x_input_set_state *XInputSetStateWrapper = XInputSetStateStub;
+#define XInputSetState XInputSetStateWrapper
 
 static void Win32LoadXInput()
 {
@@ -46,6 +48,9 @@ static void Win32LoadXInput()
     // TODO(Spencer): Log if we can't get XInput
 }
 
+// Globals
+static int XOffset;
+static int YOffset;
 static char GlobalRunning;
 static win32_offscreen_buffer GlobalBackbuffer;
 
@@ -113,13 +118,13 @@ Win32ResizeDIBSection(win32_offscreen_buffer *Buffer, int Width, int Height)
 static void
 Win32DisplayBufferInWindow(HDC DeviceContext,
                            int WindowWidth, int WindowHeight,
-                           win32_offscreen_buffer Buffer)
+                           win32_offscreen_buffer *Buffer)
 {
     StretchDIBits(DeviceContext,
                   0, 0, WindowWidth, WindowHeight,
-                  0, 0, Buffer.Width, Buffer.Height,
-                  Buffer.Memory,
-                  &Buffer.Info,
+                  0, 0, Buffer->Width, Buffer->Height,
+                  Buffer->Memory,
+                  &Buffer->Info,
                   DIB_RGB_COLORS, SRCCOPY);
 }
 
@@ -137,12 +142,57 @@ Win32MainWindowCallback(HWND Window,
             GlobalRunning = 0;
         } break;
         
-        case WM_ACTIVATEAPP:{
-            OutputDebugStringA("WM_ACTIVATEAPP\n");
-        } break;
-        
         case WM_DESTROY:{
             GlobalRunning = 0;
+        } break;
+        
+        case WM_SYSKEYDOWN:
+        case WM_SYSKEYUP:
+        case WM_KEYDOWN:
+        case WM_KEYUP:{
+            uint32_t VKCode = WParam;
+            bool WasDown = ((LParam & (1 << 30)) != 0);
+            bool IsDown  = ((LParam & (1 << 31)) != 0);
+            if (WasDown == IsDown)
+            {
+                // Note(Spencer): Eat key repeat messages
+            }
+            else if(VKCode == 'W')
+            {
+            }
+            else if (VKCode == 'A')
+            {
+            }
+            else if (VKCode == 'S')
+            {
+            }
+            else if (VKCode == 'D')
+            {
+            }
+            else if (VKCode == 'Q')
+            {
+            }
+            else if (VKCode == 'E')
+            {
+            }
+            else if (VKCode == VK_UP)
+            {
+            }
+            else if (VKCode == VK_DOWN)
+            {
+            }
+            else if (VKCode == VK_LEFT)
+            {
+            }
+            else if (VKCode == VK_RIGHT)
+            {
+            }
+            else if (VKCode == VK_ESCAPE)
+            {
+            }
+            else if (VKCode == VK_SPACE)
+            {
+            }
         } break;
         
         case WM_PAINT:{
@@ -150,7 +200,7 @@ Win32MainWindowCallback(HWND Window,
             HDC DeviceContext = BeginPaint(Window, &Paint);
             win32_window_dimension Dimension = Win32GetWindowDimension(Window);
             Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height,
-                                       GlobalBackbuffer);
+                                       &GlobalBackbuffer);
             EndPaint(Window, &Paint);
         } break;
         
@@ -199,8 +249,8 @@ WinMain(HINSTANCE Instance,
         {
             HDC DeviceContext = GetDC(Window);
             
-            int XOffset = 0;
-            int YOffset = 0;
+            // int XOffset = 0;
+            // int YOffset = 0;
             
             GlobalRunning = 1;
             while(GlobalRunning)
@@ -222,7 +272,7 @@ WinMain(HINSTANCE Instance,
                 for (DWORD ControllerIndex = 0; ControllerIndex < XUSER_MAX_COUNT; ControllerIndex++)
                 {
                     XINPUT_STATE ControllerState;
-                    if (XInputGetStateWrapper(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
+                    if (XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
                     {
                         XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
                         
@@ -241,11 +291,6 @@ WinMain(HINSTANCE Instance,
                         
                         int16_t StickX = Pad->sThumbLX;
                         int16_t StickY = Pad->sThumbLY;
-                        
-                        if (Up | Down | Left | Right | Start | Back | LeftShoulder | RightShoulder | AButton | BButton | XButton | YButton)
-                        {
-                            YOffset += 2;
-                        }
                     }
                     else
                     {
@@ -257,9 +302,7 @@ WinMain(HINSTANCE Instance,
                     
                     win32_window_dimension Dimension = Win32GetWindowDimension(Window);
                     Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height,
-                                               GlobalBackbuffer);
-                    
-                    ++XOffset;
+                                               &GlobalBackbuffer);
                 }
             }
         }
