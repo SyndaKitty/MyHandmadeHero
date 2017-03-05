@@ -22,7 +22,7 @@ struct win32_window_dimension
 typedef X_INPUT_GET_STATE(x_input_get_state);
 X_INPUT_GET_STATE(XInputGetStateStub)
 {
-    return 0;
+    return ERROR_DEVICE_NOT_CONNECTED;
 }
 static x_input_get_state *XInputGetStateWrapper = XInputGetStateStub;
 #define XInputGetState XInputGetStateWrapper
@@ -32,14 +32,19 @@ static x_input_get_state *XInputGetStateWrapper = XInputGetStateStub;
 typedef X_INPUT_SET_STATE(x_input_set_state);
 X_INPUT_SET_STATE(XInputSetStateStub)
 {
-    return 0;
+    return ERROR_DEVICE_NOT_CONNECTED;
 }
 static x_input_set_state *XInputSetStateWrapper = XInputSetStateStub;
 #define XInputSetState XInputSetStateWrapper
 
 static void Win32LoadXInput()
 {
-    HMODULE XInputLibrary = LoadLibrary("xinput1_3");
+    HMODULE XInputLibrary = LoadLibrary("xinput1_4.dll");
+    if (!XInputLibrary)
+    {
+        XInputLibrary = LoadLibrary("xinput1_3.dll");
+    }
+    
     if (XInputLibrary)
     {
         XInputGetStateWrapper = (x_input_get_state*)GetProcAddress(XInputLibrary, "XInputGetState");
@@ -153,49 +158,53 @@ Win32MainWindowCallback(HWND Window,
             uint32_t VKCode = WParam;
             bool WasDown = ((LParam & (1 << 30)) != 0);
             bool IsDown  = ((LParam & (1 << 31)) != 0);
-            if (WasDown == IsDown)
+            bool AltWasDown = ((LParam & (1 << 29)) != 0);
+            if (WasDown != IsDown)
             {
-                // Note(Spencer): Eat key repeat messages
+                if(VKCode == 'W')
+                {
+                }
+                else if (VKCode == 'A')
+                {
+                }
+                else if (VKCode == 'S')
+                {
+                }
+                else if (VKCode == 'D')
+                {
+                }
+                else if (VKCode == 'Q')
+                {
+                }
+                else if (VKCode == 'E')
+                {
+                }
+                else if (VKCode == VK_UP)
+                {
+                }
+                else if (VKCode == VK_DOWN)
+                {
+                }
+                else if (VKCode == VK_LEFT)
+                {
+                }
+                else if (VKCode == VK_RIGHT)
+                {
+                }
+                else if (VKCode == VK_ESCAPE)
+                {
+                }
+                else if (VKCode == VK_SPACE)
+                {
+                }
             }
-            else if(VKCode == 'W')
+            
+            bool AltKeyWasDown = (LParam & (1 << 29)) != 0;
+            if (VKCode == VK_F4 && AltKeyWasDown)
             {
+                GlobalRunning = 0;
             }
-            else if (VKCode == 'A')
-            {
-            }
-            else if (VKCode == 'S')
-            {
-            }
-            else if (VKCode == 'D')
-            {
-            }
-            else if (VKCode == 'Q')
-            {
-            }
-            else if (VKCode == 'E')
-            {
-            }
-            else if (VKCode == VK_UP)
-            {
-            }
-            else if (VKCode == VK_DOWN)
-            {
-            }
-            else if (VKCode == VK_LEFT)
-            {
-            }
-            else if (VKCode == VK_RIGHT)
-            {
-            }
-            else if (VKCode == VK_ESCAPE)
-            {
-            }
-            else if (VKCode == VK_SPACE)
-            {
-            }
-            // TODO(Spencer): Handle Alt+F4?
         } break;
-        
         case WM_PAINT:{
             PAINTSTRUCT Paint;
             HDC DeviceContext = BeginPaint(Window, &Paint);
@@ -291,6 +300,11 @@ WinMain(HINSTANCE Instance,
                         
                         int16_t StickX = Pad->sThumbLX;
                         int16_t StickY = Pad->sThumbLY;
+                        
+                        if (AButton)
+                        {
+                            YOffset += 1;
+                        }
                     }
                     else
                     {
