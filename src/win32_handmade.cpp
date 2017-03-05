@@ -17,6 +17,27 @@ struct win32_window_dimension
     int Height;
 };
 
+// XInput dereferenced GetState
+#define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
+typedef X_INPUT_GET_STATE(x_input_get_state);
+X_INPUT_GET_STATE(XInputGetStateStub)
+{
+    return 0;
+}
+static x_input_get_state *XInputGetStateWrapper = XInputGetStateStub;
+
+// XInput dereference SetState
+#define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+typedef X_INPUT_SET_STATE(x_input_set_state);
+X_INPUT_SET_STATE(XInputSetStateStub)
+{
+    return 0;
+}
+static x_input_set_state *XInputSetStateWrapper = XInputSetStateStub;
+
+#define XInputGetState XInputGetStateWrapper
+#define XInputSetState XInputGetStateWrapper
+
 static char GlobalRunning;
 static win32_offscreen_buffer GlobalBackbuffer;
 
