@@ -35,13 +35,21 @@ X_INPUT_SET_STATE(XInputSetStateStub)
 }
 static x_input_set_state *XInputSetStateWrapper = XInputSetStateStub;
 
-#define XInputGetState XInputGetStateWrapper
-#define XInputSetState XInputGetStateWrapper
+static void Win32LoadXInput()
+{
+    HMODULE XInputLibrary = LoadLibrary("xinput1_3");
+    if (XInputLibrary)
+    {
+        XInputGetStateWrapper = (x_input_get_state*)GetProcAddress(XInputLibrary, "XInputGetState");
+        XInputSetStateWrapper = (x_input_set_state*)GetProcAddress(XInputLibrary, "XInputSetState");
+    }
+    // TODO(Spencer): Log if we can't get XInput
+}
 
 static char GlobalRunning;
 static win32_offscreen_buffer GlobalBackbuffer;
 
-win32_window_dimension
+static win32_window_dimension
 Win32GetWindowDimension(HWND Window)
 {
     win32_window_dimension Result;
@@ -115,7 +123,7 @@ Win32DisplayBufferInWindow(HDC DeviceContext,
                   DIB_RGB_COLORS, SRCCOPY);
 }
 
-LRESULT CALLBACK
+static LRESULT CALLBACK
 Win32MainWindowCallback(HWND Window,
                         UINT Message,
                         WPARAM WParam,
@@ -160,6 +168,7 @@ WinMain(HINSTANCE Instance,
         LPSTR CommandLine,
         int ShowCode)
 {
+    Win32LoadXInput();
     WNDCLASS WindowClass = {};
     
     Win32ResizeDIBSection(&GlobalBackbuffer, 1280, 720);
@@ -213,25 +222,30 @@ WinMain(HINSTANCE Instance,
                 for (DWORD ControllerIndex = 0; ControllerIndex < XUSER_MAX_COUNT; ControllerIndex++)
                 {
                     XINPUT_STATE ControllerState;
-                    if (XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
+                    if (XInputGetStateWrapper(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
                     {
                         XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
                         
-                        char Up            = Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP ;
-                        char Down          = Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN ;
-                        char Left          = Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT;
-                        char Right         = Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT;
-                        char Start         = Pad->wButtons & XINPUT_GAMEPAD_START;
-                        char Back          = Pad->wButtons & XINPUT_GAMEPAD_BACK;
-                        char LeftShoulder  = Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER;
-                        char RightShoulder = Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER;
-                        char AButton       = Pad->wButtons & XINPUT_GAMEPAD_A ;
-                        char BButton       = Pad->wButtons & XINPUT_GAMEPAD_B ;
-                        char XButton       = Pad->wButtons & XINPUT_GAMEPAD_X ;
-                        char YButton       = Pad->wButtons & XINPUT_GAMEPAD_Y ;
+                        bool Up            = Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP;
+                        bool Down          = Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN ;
+                        bool Left          = Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT;
+                        bool Right         = Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT;
+                        bool Start         = Pad->wButtons & XINPUT_GAMEPAD_START;
+                        bool Back          = Pad->wButtons & XINPUT_GAMEPAD_BACK;
+                        bool LeftShoulder  = Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER;
+                        bool RightShoulder = Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER;
+                        bool AButton       = Pad->wButtons & XINPUT_GAMEPAD_A;
+                        bool BButton       = Pad->wButtons & XINPUT_GAMEPAD_B;
+                        bool XButton       = Pad->wButtons & XINPUT_GAMEPAD_X;
+                        bool YButton       = Pad->wButtons & XINPUT_GAMEPAD_Y;
                         
                         int16_t StickX = Pad->sThumbLX;
                         int16_t StickY = Pad->sThumbLY;
+                        
+                        if (Up | Down | Left | Right | Start | Back | LeftShoulder | RightShoulder | AButton | BButton | XButton | YButton)
+                        {
+                            YOffset += 2;
+                        }
                     }
                     else
                     {
@@ -246,7 +260,6 @@ WinMain(HINSTANCE Instance,
                                                GlobalBackbuffer);
                     
                     ++XOffset;
-                    YOffset += 2;
                 }
             }
         }
