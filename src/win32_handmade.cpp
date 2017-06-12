@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <stdint.h>
 #include <xinput.h>
+#include <dsound.h>
 
 struct win32_offscreen_buffer
 {
@@ -37,6 +38,9 @@ X_INPUT_SET_STATE(XInputSetStateStub)
 static x_input_set_state *XInputSetStateWrapper = XInputSetStateStub;
 #define XInputSetState XInputSetStateWrapper
 
+#define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter);
+typedef DIRECT_SOUND_CREATE(direct_sound_create);
+
 static void Win32LoadXInput()
 {
     HMODULE XInputLibrary = LoadLibrary("xinput1_4.dll");
@@ -51,6 +55,86 @@ static void Win32LoadXInput()
         XInputSetStateWrapper = (x_input_set_state*)GetProcAddress(XInputLibrary, "XInputSetState");
     }
     // TODO(Spencer): Log if we can't get XInput
+}
+
+static void Win32InitDSound(HWND Window, int32_t SamplesPerSecond, int32_t BufferSize)
+{
+    // Load the library
+    HMODULE DSoundLibrary = LoadLibrary("dsound.dll");
+    
+    if (DSoundLibrary){
+        // Get a DirectSound object
+        direct_sound_create *DirectSoundCreate = (direct_sound_create*)GetProcAddress(DSoundLibrary, "DirectSoundCreate");
+        LPDIRECTSOUND DirectSound;
+        
+        if (DirectSoundCreate && SUCCEEDED(DirectSoundCreate(0, &DirectSound, 0)))
+        {
+            WAVEFORMATEX WaveFormat = {};
+            WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
+            WaveFormat.channels = 2;
+            WaveFormat.nSamplesPerSec = SamplesPerSecond;
+            WaveFormat.nBlockAlign = WaveFormat.nChannels * WaveFormat.wBitsPerSample / 8;
+            WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
+            WaveFormat.wBitsPerSample = 16;
+            WaveFormat.cbSize = 0;
+            
+            if (SUCCEEDED(DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY)))
+            {
+                DSBUFFERDESC BufferDescription = {};
+                
+                BufferDescription.dwSize = sizeof(BufferDescription);
+                BufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
+                
+                // Create primary buffer
+                LPDIRECTSOUNDBUFFER PrimaryBuffer;
+                if(SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &PrimaryBuffer, 0)))
+                {
+                    if (SUCCEEDED(PrimaryBuffer->SetFormat(&WaveFormat))){
+                        
+                    }
+                    else 
+                    {
+                        // TODO(Spencer): Log failure
+                    }
+                }
+                else
+                {
+                    // TODO(Spencer): Log failure
+                }
+            }
+            else
+            {
+                // TODO(Spencer): Log failure
+            }
+            
+            // Create a secondary buffer
+            DSBUFFERDESC BufferDescription = {};
+            
+            BufferDescription.dwSize = sizeof(BufferDescription);
+            BufferDescription.dwFlags = 0;
+            BufferDescription.dwBufferBytes = BufferSize;
+            BufferDescription.lpwfxFormat = &WaveFormat;
+            LPDIRECTIONSOUNDBUGGER SecondBuffer;
+            
+            if(SUCCEEDED(DirectSound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, 0)))
+            {
+                
+            }
+            else
+            {
+                // TODO(Spencer): Log failure
+            }
+            // Start
+        }
+        else
+        {
+            // TODO(Spencer): Log failure
+        }
+    }
+    else
+    {
+        // TODO(Spencer): Log failure
+    }
 }
 
 // Globals
@@ -75,7 +159,7 @@ Win32GetWindowDimension(HWND Window)
 static void
 RenderWeirdGradient(win32_offscreen_buffer *Buffer, int BlueOffset, int GreenOffset)
 {
-    uint8_t *Row = (uint8_t *)Buffer->Memory;    
+    uint8_t *Row = (uint8_t *)Buffer->Memory;
     for(int Y = 0;
         Y < Buffer->Height;
         ++Y)
@@ -138,7 +222,7 @@ Win32MainWindowCallback(HWND Window,
                         UINT Message,
                         WPARAM WParam,
                         LPARAM LParam)
-{       
+{
     LRESULT Result = 0;
     
     switch(Message)
@@ -261,6 +345,8 @@ WinMain(HINSTANCE Instance,
             // int XOffset = 0;
             // int YOffset = 0;
             
+            Win32InitDSound(Window, 48000, 48000 * sizeof(int16) * 2);
+            
             GlobalRunning = 1;
             while(GlobalRunning)
             {
@@ -301,9 +387,11 @@ WinMain(HINSTANCE Instance,
                         int16_t StickX = Pad->sThumbLX;
                         int16_t StickY = Pad->sThumbLY;
                         
+                        
                         if (AButton)
                         {
-                            YOffset += 1;
+                            XOffset += StickX / 3000;
+                            YOffset -= StickY / 3000;
                         }
                     }
                     else
@@ -311,12 +399,12 @@ WinMain(HINSTANCE Instance,
                         // TODO(Spencer): Handle unavailable controller
                     }
                     
-                    // Render
-                    RenderWeirdGradient(&GlobalBackbuffer, XOffset, YOffset);
-                    
-                    win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-                    Win32DisplayBufferInWindow(&GlobalBackbuffer, DeviceContext, Dimension.Width, Dimension.Height);
                 }
+                // Render
+                RenderWeirdGradient(&GlobalBackbuffer, XOffset, YOffset);
+                
+                win32_window_dimension Dimension = Win32GetWindowDimension(Window);
+                Win32DisplayBufferInWindow(&GlobalBackbuffer, DeviceContext, Dimension.Width, Dimension.Height);
             }
         }
     }
